@@ -1,8 +1,11 @@
-import { connectDB } from "../../lib/db";
-import Application from "../../models/Application";
-import Payment from "../../models/Payment";
+import { applyCors } from "../../lib/cors.js";
+import { connectDB } from "../../lib/db.js";
+import Application from "../../models/Application.js";
+import Payment from "../../models/Payment.js";
 
 export default async function handler(req, res) {
+  if (applyCors(req, res, ["GET", "OPTIONS"])) return;
+
   if (req.method !== "GET") {
     return res.status(405).json({ error: "Method not allowed" });
   }
@@ -17,8 +20,5 @@ export default async function handler(req, res) {
   const application = await Application.findOne({ applicationId }).lean();
   const payment = await Payment.findOne({ applicationId }).lean();
 
-  return res.json({
-    application,
-    payment,
-  });
+  return res.json({ application, payment });
 }
