@@ -1,11 +1,9 @@
 export async function getPhonePeAccessToken() {
-  const response = await fetch(
+  const res = await fetch(
     "https://api-preprod.phonepe.com/apis/identity-manager/v1/oauth/token",
     {
       method: "POST",
-      headers: {
-        "Content-Type": "application/x-www-form-urlencoded"
-      },
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
       body: new URLSearchParams({
         client_id: process.env.PHONEPE_CLIENT_ID,
         client_secret: process.env.PHONEPE_CLIENT_SECRET,
@@ -15,11 +13,6 @@ export async function getPhonePeAccessToken() {
     }
   );
 
-  const data = await response.json();
-
-  if (!data.access_token) {
-    throw new Error("Failed to get PhonePe access token");
-  }
-
+  const data = await res.json();
   return data.access_token;
 }
