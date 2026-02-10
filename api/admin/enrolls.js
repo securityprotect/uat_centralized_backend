@@ -1,8 +1,11 @@
-import { connectDB } from "../../lib/db";
-import Application from "../../models/Application";
-import Payment from "../../models/Payment";
+import { applyCors } from "../../lib/cors.js";
+import { connectDB } from "../../lib/db.js";
+import Application from "../../models/Application.js";
+import Payment from "../../models/Payment.js";
 
 export default async function handler(req, res) {
+  if (applyCors(req, res, ["GET", "OPTIONS"])) return;
+
   await connectDB();
 
   const apps = await Application.find({ status: "PAID_PENDING_APPROVAL" })
@@ -12,15 +15,15 @@ export default async function handler(req, res) {
   const appIds = apps.map((a) => a.applicationId);
 
   const payments = await Payment.find({ applicationId: { $in: appIds } })
-    .select("applicationId status amount phonePeTransactionId merchantTransactionId paidAt createdAt")
+    .sort({ createdAt: -1 })
     .lean();
 
-  const paymentMap = new Map(payments.map((p) => [p.applicationId, p]));
+  const map = new Map(payments.map((p) => [p.applicationId, p]));
 
-  const result = apps.map((a) => ({
-    ...a,
-    payment: paymentMap.get(a.applicationId) || null,
-  }));
-
-  res.json(result);
+  res.json(
+    apps.map((a) => ({
+      ...a,
+      payment: map.get(a.applicationId) || null,
+    }))
+  );
 }
