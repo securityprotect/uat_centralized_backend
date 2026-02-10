@@ -1,23 +1,24 @@
-import connectDB from "../../lib/mongo";
-import Submission from "../../models/Submission";
+import { connectDB } from "../../lib/mongo";
+import mongoose from "mongoose";
+
+const Apply =
+  mongoose.models.Apply || mongoose.model("Apply");
 
 export default async function handler(req, res) {
-  await connectDB();
-  const event = req.body;
+  try {
+    await connectDB();
 
-  if (event?.event === "checkout.order.completed") {
-    await Submission.findOneAndUpdate(
-      { transactionId: event.data.merchantTransactionId },
-      { paymentStatus: "SUCCESS" }
-    );
-  }
+    const { transactionId, state } = req.body;
 
-  if (event?.event === "checkout.order.failed") {
-    await Submission.findOneAndUpdate(
-      { transactionId: event.data.merchantTransactionId },
-      { paymentStatus: "FAILED" }
-    );
+    if (state === "COMPLETED") {
+      await Apply.findOneAndUpdate(
+        { transactionId },
+        { paymentStatus: "PAID" }
+      );
+    }
+
+    res.status(200).send("OK");
+  } catch (e) {
+    res.status(500).send("Webhook error");
   }
-  res.setHeader("Access-Control-Allow-Origin", "*");
-  res.status(200).send("OK");
 }
