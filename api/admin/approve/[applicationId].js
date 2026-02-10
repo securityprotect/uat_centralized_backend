@@ -1,12 +1,16 @@
-import { connectDB } from "../../../lib/db";
-import Application from "../../../models/Application";
+import { applyCors } from "../../../lib/cors.js";
+import { connectDB } from "../../../lib/db.js";
+import Application from "../../../models/Application.js";
 
 export default async function handler(req, res) {
+  if (applyCors(req, res, ["POST", "OPTIONS"])) return;
+
   if (req.method !== "POST") {
     return res.status(405).json({ error: "Method not allowed" });
   }
 
   await connectDB();
+
   const { applicationId } = req.query;
 
   const app = await Application.findOne({ applicationId });
