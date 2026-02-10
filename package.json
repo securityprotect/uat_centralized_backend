@@ -3,6 +3,7 @@
   "private": true,
   "type": "module",
   "dependencies": {
-    "mongoose": "^8.0.0"
+    "mongoose": "^8.0.0",
+    "phonepe-be-sdk": "^2.0.0"
   }
 }
