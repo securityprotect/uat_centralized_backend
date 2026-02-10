@@ -1,11 +1,10 @@
-import { connectDB } from "../lib/db";
-import { applyCors } from "../lib/cors";
-import { generateApplicationId } from "../lib/applicationId";
-import Application from "../models/Application";
-import { createPhonePePayment } from "./payment/create";
+import { connectDB } from "../lib/db.js";
+import { applyCors } from "../lib/cors.js";
+import { generateApplicationId } from "../lib/applicationId.js";
+import Application from "../models/Application.js";
+import { createPhonePePayment } from "./payment/create.js";
 
 export default async function handler(req, res) {
-  // ✅ CORS + OPTIONS preflight fix
   if (applyCors(req, res, ["POST", "OPTIONS"])) return;
 
   if (req.method !== "POST") {
@@ -15,7 +14,6 @@ export default async function handler(req, res) {
   try {
     const { name, phone, vehicle, plan, amount, email, address } = req.body || {};
 
-    // ✅ Basic validation
     if (!name || !phone || !vehicle || !plan || !amount) {
       return res.status(400).json({ error: "Missing fields" });
     }
@@ -27,10 +25,8 @@ export default async function handler(req, res) {
 
     await connectDB();
 
-    // ✅ Generate applicationId
     const applicationId = generateApplicationId();
 
-    // 1) Save application immediately (INITIATED)
     await Application.create({
       applicationId,
       name: String(name).trim(),
@@ -43,27 +39,17 @@ export default async function handler(req, res) {
       status: "INITIATED",
     });
 
-    // 2) Create payment order in PhonePe (PENDING)
     const payment = await createPhonePePayment({
       applicationId,
       amount: numericAmount,
-      applicant: {
-        name,
-        phone,
-        email,
-        vehicle,
-        address,
-        plan,
-      },
+      applicant: { name, phone, email, vehicle, address, plan },
     });
 
-    // 3) Update application status
-    await Application.findOneAndUpdate(
+    await Application.updateOne(
       { applicationId },
       { status: "PAYMENT_PENDING" }
     );
 
-    // ✅ Return payment URL to frontend
     return res.json({
       applicationId,
       paymentUrl: payment.paymentUrl,
