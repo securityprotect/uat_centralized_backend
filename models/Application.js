@@ -2,7 +2,7 @@ import mongoose from "mongoose";
 
 const ApplicationSchema = new mongoose.Schema(
   {
-    applicationId: { type: String, required: true, unique: true, index: true, trim: true },
+    applicationId: { type: String, required: true, unique: true, index: true },
 
     name: { type: String, required: true, trim: true },
     phone: { type: String, required: true, trim: true, index: true },
@@ -16,7 +16,13 @@ const ApplicationSchema = new mongoose.Schema(
 
     status: {
       type: String,
-      enum: ["INITIATED", "PAYMENT_PENDING", "PAID_PENDING_APPROVAL", "ACTIVE", "REJECTED"],
+      enum: [
+        "INITIATED",
+        "PAYMENT_PENDING",
+        "PAID_PENDING_APPROVAL",
+        "ACTIVE",
+        "REJECTED",
+      ],
       default: "INITIATED",
       index: true,
     },
@@ -27,6 +33,5 @@ const ApplicationSchema = new mongoose.Schema(
   { timestamps: true, collection: "applications" }
 );
 
-ApplicationSchema.index({ applicationId: 1, status: 1 });
-
-export default mongoose.models.Application || mongoose.model("Application", ApplicationSchema);
+export default mongoose.models.Application ||
+  mongoose.model("Application", ApplicationSchema);
