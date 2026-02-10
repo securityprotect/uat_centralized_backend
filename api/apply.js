@@ -1,43 +1,56 @@
-import connectDB from "../lib/db";
-import { applyCors } from "../lib/cors";
-import Submission from "../models/Submission";
+import { generateApplicationId } from "../lib/applicationId";
+import { phonePeHeaders } from "./phonepay/auth";
 
 export default async function handler(req, res) {
-  if (applyCors(req, res, ["POST", "OPTIONS"])) return;
-
   if (req.method !== "POST") {
-    return res.status(405).json({ message: "Method not allowed" });
+    return res.status(405).json({ error: "Method not allowed" });
   }
 
   try {
-    await connectDB();
+    const { name, phone, vehicle, plan, amount } = req.body;
 
-    const { name, phone, mobile, email, vehicle, vehicleNumber, address, plan } =
-      req.body || {};
-
-    if (!name || !(phone || mobile) || !email || !(vehicle || vehicleNumber) || !address) {
-      return res.status(400).json({
-        success: false,
-        message: "Missing required fields",
-      });
+    if (!name || !phone || !vehicle || !amount) {
+      return res.status(400).json({ error: "Missing fields" });
     }
 
-    const doc = await Submission.create({
-      name: String(name).trim(),
-      mobile: String(phone || mobile).trim(),
-      email: String(email).trim().toLowerCase(),
-      vehicleNumber: String(vehicle || vehicleNumber).trim(),
-      address: String(address).trim(),
-      plan: plan ? String(plan).trim() : "Individual",
-      paymentStatus: "PENDING",
+    const applicationId = generateApplicationId();
+
+    const payload = {
+      merchantId: process.env.PHONEPE_MERCHANT_ID,
+      merchantTransactionId: applicationId,
+      merchantUserId: applicationId,
+      amount: amount * 100,
+      redirectUrl: `${process.env.BASE_URL}/api/payment/callback`,
+      redirectMode: "POST",
+      callbackUrl: `${process.env.BASE_URL}/api/payment/webhook`,
+      paymentInstrument: { type: "PAY_PAGE" }
+    };
+
+    const { base64Payload, checksum } = phonePeHeaders(payload);
+
+    const response = await fetch(process.env.PHONEPE_PAY_URL, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-VERIFY": checksum
+      },
+      body: JSON.stringify({ request: base64Payload })
     });
 
-    return res.status(200).json({
-      success: true,
-      applicationId: doc._id,
+    const data = await response.json();
+
+    if (!data.success) {
+      return res.status(500).json({ error: "Payment init failed" });
+    }
+
+    return res.json({
+      applicationId,
+      paymentUrl: data.data.instrumentResponse.redirectInfo.url,
+      userData: { name, phone, vehicle, plan } // frontend/session use
     });
+
   } catch (err) {
-    console.error("APPLY ERROR:", err);
-    return res.status(500).json({ success: false, message: "Apply failed" });
+    console.error(err);
+    return res.status(500).json({ error: "Server error" });
   }
 }

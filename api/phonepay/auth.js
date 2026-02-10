@@ -1,18 +1,14 @@
-export async function getPhonePeAccessToken() {
-  const res = await fetch(
-    "https://api-preprod.phonepe.com/apis/identity-manager/v1/oauth/token",
-    {
-      method: "POST",
-      headers: { "Content-Type": "application/x-www-form-urlencoded" },
-      body: new URLSearchParams({
-        client_id: process.env.PHONEPE_CLIENT_ID,
-        client_secret: process.env.PHONEPE_CLIENT_SECRET,
-        client_version: process.env.PHONEPE_CLIENT_VERSION,
-        grant_type: "client_credentials"
-      })
-    }
-  );
+import crypto from "crypto";
 
-  const data = await res.json();
-  return data.access_token;
+export function phonePeHeaders(payload) {
+  const saltKey = process.env.PHONEPE_SALT_KEY;
+  const saltIndex = process.env.PHONEPE_SALT_INDEX;
+
+  const base64Payload = Buffer.from(JSON.stringify(payload)).toString("base64");
+  const string = base64Payload + "/pg/v1/pay" + saltKey;
+
+  const sha256 = crypto.createHash("sha256").update(string).digest("hex");
+  const checksum = `${sha256}###${saltIndex}`;
+
+  return { base64Payload, checksum };
 }
