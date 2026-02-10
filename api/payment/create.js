@@ -1,33 +1,37 @@
 import crypto from "crypto";
 import fetch from "node-fetch";
+import connectDB from "../../lib/mongo";
+import Submission from "../../models/Submission";
 
 export default async function handler(req, res) {
   try {
-    console.log("👉 PAYMENT CREATE API HIT");
+    if (req.method !== "POST") return res.status(405).end();
+
+    await connectDB();
 
     const { submissionId } = req.body;
-    if (!submissionId) {
-      return res.status(400).json({ error: "submissionId missing" });
+    const submission = await Submission.findById(submissionId);
+
+    if (!submission) {
+      return res.status(404).json({ error: "Submission not found" });
     }
 
     const merchantId = process.env.PHONEPE_MERCHANT_ID;
     const clientSecret = process.env.PHONEPE_CLIENT_SECRET;
-    const saltIndex = "1";
+    const saltIndex = process.env.PHONEPE_SALT_INDEX;
 
-    const merchantTransactionId = "TXN_" + Date.now();
+    const transactionId = "TXN_" + Date.now();
 
     const payload = {
       merchantId,
-      merchantTransactionId,
+      merchantTransactionId: transactionId,
       merchantUserId: submissionId,
-      amount: 9900, // ₹99 = 9900 paise
+      amount: 9900,
       redirectUrl: "https://uat-user-frontend.vercel.app/success",
       redirectMode: "REDIRECT",
       callbackUrl:
         "https://uat-centralized-backend.vercel.app/api/payment/webhook",
-      paymentInstrument: {
-        type: "PAY_PAGE"
-      }
+      paymentInstrument: { type: "PAY_PAGE" }
     };
 
     const base64Payload = Buffer.from(
@@ -42,8 +46,6 @@ export default async function handler(req, res) {
       "###" +
       saltIndex;
 
-    console.log("👉 Calling PhonePe");
-
     const phonepeRes = await fetch(
       "https://api-preprod.phonepe.com/apis/pg-sandbox/pg/v1/pay",
       {
@@ -52,28 +54,25 @@ export default async function handler(req, res) {
           "Content-Type": "application/json",
           "X-VERIFY": checksum
         },
-        body: JSON.stringify({
-          request: base64Payload
-        })
+        body: JSON.stringify({ request: base64Payload })
       }
     );
 
-    const phonepeData = await phonepeRes.json();
-    console.log("👉 PhonePe response", phonepeData);
+    const data = await phonepeRes.json();
 
-    if (!phonepeData?.data?.instrumentResponse?.redirectInfo?.url) {
-      return res.status(500).json({
-        error: "PhonePe did not return redirect URL",
-        phonepeData
-      });
+    const redirectUrl =
+      data?.data?.instrumentResponse?.redirectInfo?.url;
+
+    if (!redirectUrl) {
+      return res.status(500).json({ error: "PhonePe error", data });
     }
 
-    return res.json({
-      paymentUrl:
-        phonepeData.data.instrumentResponse.redirectInfo.url
-    });
+    submission.transactionId = transactionId;
+    await submission.save();
+
+    return res.json({ paymentUrl: redirectUrl });
   } catch (err) {
-    console.error("❌ PAYMENT ERROR", err);
-    return res.status(500).json({ error: err.message });
+    console.error(err);
+    res.status(500).json({ error: err.message });
   }
 }
