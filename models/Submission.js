@@ -8,8 +8,8 @@ const SubmissionSchema = new mongoose.Schema(
     vehicleNumber: String,
     address: String,
     plan: String,
-    merchantOrderId: String,
-    paymentStatus: { type: String, default: "PENDING" }
+    paymentStatus: { type: String, default: "PENDING" },
+    transactionId: String
   },
   { timestamps: true }
 );
