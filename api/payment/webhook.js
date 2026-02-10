@@ -1,15 +1,6 @@
-import crypto from "crypto";
-import { connectDB } from "../../lib/db";
-import Payment from "../../models/Payment";
-import Application from "../../models/Application";
-
-/**
- * NOTE:
- * - This webhook implementation is kept simple because PhonePe signature verification
- *   depends on exact headers/body config.
- * - You MUST ensure Next.js API route does not auto-parse body if you need raw body.
- * - Still: we do idempotency + DB matching.
- */
+import { connectDB } from "../../lib/db.js";
+import Payment from "../../models/Payment.js";
+import Application from "../../models/Application.js";
 
 export default async function handler(req, res) {
   await connectDB();
@@ -17,7 +8,6 @@ export default async function handler(req, res) {
   try {
     const payload = req.body;
 
-    // PhonePe typical success code:
     if (payload?.code !== "PAYMENT_SUCCESS") {
       return res.json({ ok: true });
     }
@@ -30,11 +20,9 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: "Invalid webhook payload" });
     }
 
-    // 1) Fetch payment record
-    const payment = await Payment.findOne({ applicationId });
+    const existing = await Payment.findOne({ applicationId });
 
-    // If payment doesn't exist, still create minimal record (rare case)
-    if (!payment) {
+    if (!existing) {
       await Payment.create({
         applicationId,
         merchantTransactionId: applicationId,
@@ -47,12 +35,10 @@ export default async function handler(req, res) {
         paidAt: new Date(),
       });
     } else {
-      // 2) Idempotency: ignore duplicates
-      if (payment.status === "SUCCESS") {
+      if (existing.status === "SUCCESS") {
         return res.json({ success: true, duplicate: true });
       }
 
-      // 3) Update payment success
       await Payment.updateOne(
         { applicationId },
         {
@@ -64,7 +50,6 @@ export default async function handler(req, res) {
       );
     }
 
-    // 4) Update application status
     await Application.updateOne(
       { applicationId },
       { status: "PAID_PENDING_APPROVAL" }
@@ -72,7 +57,7 @@ export default async function handler(req, res) {
 
     return res.json({ success: true });
   } catch (err) {
-    console.error("Webhook error:", err);
+    console.error("WEBHOOK ERROR:", err);
     return res.status(500).json({ error: "Webhook failed" });
   }
 }
