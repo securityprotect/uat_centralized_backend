@@ -18,6 +18,6 @@ export default async function handler(req, res) {
       { paymentStatus: "FAILED" }
     );
   }
-
+  res.setHeader("Access-Control-Allow-Origin", "*");
   res.status(200).send("OK");
 }
