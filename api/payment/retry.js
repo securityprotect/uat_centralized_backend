@@ -1,22 +1,23 @@
-import { connectDB } from "../../lib/db";
-import Application from "../../models/Application";
-import { createPhonePePayment } from "./create";
+import { applyCors } from "../../lib/cors.js";
+import { connectDB } from "../../lib/db.js";
+import Application from "../../models/Application.js";
+import { createPhonePePayment } from "./create.js";
 
 export default async function handler(req, res) {
+  if (applyCors(req, res, ["POST", "OPTIONS"])) return;
+
   if (req.method !== "POST") {
     return res.status(405).json({ error: "Method not allowed" });
   }
 
-  const { applicationId } = req.body || {};
-  const appId = String(applicationId || "").trim();
-
-  if (!appId) {
+  const applicationId = String(req.body?.applicationId || "").trim();
+  if (!applicationId) {
     return res.status(400).json({ error: "applicationId is required" });
   }
 
   await connectDB();
 
-  const app = await Application.findOne({ applicationId: appId });
+  const app = await Application.findOne({ applicationId });
   if (!app) {
     return res.status(404).json({ error: "Application not found" });
   }
@@ -26,7 +27,7 @@ export default async function handler(req, res) {
   }
 
   const payment = await createPhonePePayment({
-    applicationId: appId,
+    applicationId,
     amount: app.amount,
     applicant: {
       name: app.name,
@@ -39,13 +40,9 @@ export default async function handler(req, res) {
   });
 
   await Application.updateOne(
-    { applicationId: appId },
+    { applicationId },
     { status: "PAYMENT_PENDING" }
   );
 
-  return res.json({
-    success: true,
-    applicationId: appId,
-    paymentUrl: payment.paymentUrl,
-  });
+  return res.json({ success: true, paymentUrl: payment.paymentUrl });
 }
