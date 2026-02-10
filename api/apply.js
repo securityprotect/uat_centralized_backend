@@ -2,13 +2,20 @@ import connectDB from "../lib/mongo";
 import Submission from "../models/Submission";
 
 export default async function handler(req, res) {
-  if (req.method !== "POST") return res.status(405).end();
+  if (req.method !== "POST") {
+    return res.status(405).json({ error: "Method not allowed" });
+  }
 
-  await connectDB();
+  try {
+    await connectDB();
+    const submission = await Submission.create(req.body);
 
-  const submission = await Submission.create(req.body);
-
-  return res.json({
-    submissionId: submission._id
-  });
+    return res.status(200).json({
+      success: true,
+      submissionId: submission._id.toString()
+    });
+  } catch (err) {
+    console.error("APPLY ERROR:", err);
+    return res.status(500).json({ error: err.message });
+  }
 }
