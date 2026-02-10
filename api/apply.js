@@ -1,9 +1,13 @@
 import { connectDB } from "../lib/db";
+import { applyCors } from "../lib/cors";
 import { generateApplicationId } from "../lib/applicationId";
 import Application from "../models/Application";
 import { createPhonePePayment } from "./payment/create";
 
 export default async function handler(req, res) {
+  // ✅ CORS + OPTIONS preflight fix
+  if (applyCors(req, res, ["POST", "OPTIONS"])) return;
+
   if (req.method !== "POST") {
     return res.status(405).json({ error: "Method not allowed" });
   }
@@ -11,6 +15,7 @@ export default async function handler(req, res) {
   try {
     const { name, phone, vehicle, plan, amount, email, address } = req.body || {};
 
+    // ✅ Basic validation
     if (!name || !phone || !vehicle || !plan || !amount) {
       return res.status(400).json({ error: "Missing fields" });
     }
@@ -22,6 +27,7 @@ export default async function handler(req, res) {
 
     await connectDB();
 
+    // ✅ Generate applicationId
     const applicationId = generateApplicationId();
 
     // 1) Save application immediately (INITIATED)
@@ -37,7 +43,7 @@ export default async function handler(req, res) {
       status: "INITIATED",
     });
 
-    // 2) Create payment (PENDING)
+    // 2) Create payment order in PhonePe (PENDING)
     const payment = await createPhonePePayment({
       applicationId,
       amount: numericAmount,
@@ -57,6 +63,7 @@ export default async function handler(req, res) {
       { status: "PAYMENT_PENDING" }
     );
 
+    // ✅ Return payment URL to frontend
     return res.json({
       applicationId,
       paymentUrl: payment.paymentUrl,
