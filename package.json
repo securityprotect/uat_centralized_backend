@@ -1,0 +1,8 @@
+{
+  "name": "uat_centralized_backend",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "mongoose": "^8.0.0"
+  }
+}
