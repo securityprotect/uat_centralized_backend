@@ -4,14 +4,19 @@ import connectDB from "../../lib/mongo";
 import Submission from "../../models/Submission";
 
 export default async function handler(req, res) {
-  try {
-    if (req.method !== "POST") return res.status(405).end();
+  if (req.method !== "POST") {
+    return res.status(405).json({ error: "Method not allowed" });
+  }
 
+  try {
     await connectDB();
 
     const { submissionId } = req.body;
-    const submission = await Submission.findById(submissionId);
+    if (!submissionId) {
+      return res.status(400).json({ error: "submissionId missing" });
+    }
 
+    const submission = await Submission.findById(submissionId);
     if (!submission) {
       return res.status(404).json({ error: "Submission not found" });
     }
@@ -70,9 +75,9 @@ export default async function handler(req, res) {
     submission.transactionId = transactionId;
     await submission.save();
 
-    return res.json({ paymentUrl: redirectUrl });
+    return res.status(200).json({ paymentUrl: redirectUrl });
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: err.message });
+    console.error("PAYMENT ERROR:", err);
+    return res.status(500).json({ error: err.message });
   }
 }
